@@ -19,41 +19,37 @@ const ResumeUpload = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
+  
     if (!selectedFile) {
       alert("Please upload a resume.");
       return;
     }
-
+  
     setIsUploading(true);
-
+  
     try {
-
-      const fileContent = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = reject;
-        reader.readAsText(selectedFile); 
-      });
-
-
-      const payload = {
-        resume_summary: selectedFile,
-        job_description,
-      };
-
-      console.log(payload);
-
-      const response = await fetch("https://llm-api-8yhu.onrender.com/upload", {
+      const formData = new FormData();
+      formData.append("resume", selectedFile); // Ensure the name matches backend expectation
+      formData.append("job_description", job_description);
+      formData.append("knowledge_domain", knowledgeDomain);
+  
+      // Debugging: Log FormData
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}:`, value);
+      }
+  
+      const response = await fetch("https://llm-api-8yhu.onrender.com", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        resume_summary:selectedFile,
+        job_description:job_description
       });
-
+  
       if (!response.ok) {
+        const errorResponse = await response.text();
+        console.error("Server response:", errorResponse);
         throw new Error("Failed to upload data.");
       }
-
+  
       const result = await response.json();
       alert("Data uploaded successfully!");
       console.log(result);
@@ -64,7 +60,8 @@ const ResumeUpload = () => {
       setIsUploading(false);
     }
   };
-
+  
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-indigo-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
