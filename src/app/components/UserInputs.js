@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { resolve } from "styled-jsx/css";
 
 const ResumeUpload = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -35,9 +36,9 @@ const ResumeUpload = () => {
         reader.readAsText(selectedFile); 
       });
 
-      // Prepare the payload
+
       const payload = {
-        resume_summary: fileContent, // Parsed content of the file
+        resume_summary: selectedFile,
         job_description,
       };
 
