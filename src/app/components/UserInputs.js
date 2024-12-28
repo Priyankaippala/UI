@@ -40,8 +40,7 @@ const ResumeUpload = () => {
   
       const response = await fetch("https://llm-api-8yhu.onrender.com/upload", {
         method: "POST",
-        file:selectedFile,
-        job_description:job_description
+        body:formData
       });
   
       if (!response.ok) {
