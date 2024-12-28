@@ -29,7 +29,7 @@ const ResumeUpload = () => {
   
     try {
       const formData = new FormData();
-      formData.append("resume", selectedFile); // Ensure the name matches backend expectation
+      formData.append("file", selectedFile); // Ensure the name matches backend expectation
       formData.append("job_description", job_description);
       formData.append("knowledge_domain", knowledgeDomain);
   
