@@ -38,7 +38,7 @@ const ResumeUpload = () => {
         console.log(`${key}:`, value);
       }
   
-      const response = await fetch("https://llm-api-8yhu.onrender.com", {
+      const response = await fetch("https://llm-api-8yhu.onrender.com/upload", {
         method: "POST",
         resume_summary:selectedFile,
         job_description:job_description
