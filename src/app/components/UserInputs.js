@@ -1,5 +1,4 @@
 "use client";
-import { consumeDynamicAccess } from "next/dist/server/app-render/dynamic-rendering";
 import { useState } from "react";
 
 const ResumeUpload = ({ closeModal, setQuestions, setIsInterviewStarted }) => {

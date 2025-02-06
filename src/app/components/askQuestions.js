@@ -7,6 +7,8 @@ const MediaInput = ({ questions, setIsInterviewStarted }) => {
   const [mediaStream, setMediaStream] = useState(null);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [recordedResponses, setRecordedResponses] = useState([]);
+  const [feedbackResponses, setFeedbackResponses] = useState([]); // Stores feedback for each question
+  const [isInterviewComplete, setIsInterviewComplete] = useState(false);
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -29,31 +31,37 @@ const MediaInput = ({ questions, setIsInterviewStarted }) => {
     };
   }, []);
 
-  const convertSpeechToText = async (audioBlob) => {
-    const formData = new FormData();
-    formData.append("audio", audioBlob);
-
-    try {
-        const response = await fetch("https://llm-api-8yhu.onrender.com/convert-speech", {
-            method: "POST",
-            body: formData,
-        });
-
-        const text = await response.text(); // Get raw response
-        console.log("Raw API Response:", text);
-
-        const data = JSON.parse(text);
-        return data.text || "[Could not transcribe]";
-    } catch (error) {
-        console.error("Error transcribing audio:", error);
-        return "[Error in transcription]";
-    }
-};
-
   const startRecording = () => {
     if (!mediaStream) return;
+
     const recorder = new MediaRecorder(mediaStream);
     let blobs = [];
+    let recognition;
+
+    if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onresult = (event) => {
+        const text = event.results[0][0].transcript;
+        setRecordedResponses((prev) => [
+          ...prev,
+          {
+            question: questions[currentQuestionIndex],
+            response: text,
+          },
+        ]);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+      };
+    } else {
+      console.warn("Speech recognition is not supported in this browser.");
+    }
 
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -62,13 +70,16 @@ const MediaInput = ({ questions, setIsInterviewStarted }) => {
     };
 
     recorder.onstop = () => {
-      setRecordedResponses((prev) => [
-        ...prev,
-        { question: questions[currentQuestionIndex], response: blobs },
-      ]);
+      if (recognition) {
+        recognition.stop();
+      }
     };
 
     recorder.start();
+    if (recognition) {
+      recognition.start();
+    }
+
     setMediaRecorder(recorder);
     setIsRecording(true);
   };
@@ -80,22 +91,66 @@ const MediaInput = ({ questions, setIsInterviewStarted }) => {
     }
   };
 
-  const handleNextQuestion = () => {
-    stopRecording();
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
-    } else {
-      console.log("Interview completed. Responses:", recordedResponses);
-      handleExitInterview();
+  const submitResponse = async (question, response) => {
+    try {
+      const res = await fetch("https://feedback-api-86n9.onrender.com/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question, response }),
+      });
+
+      const data = await res.json();
+      setFeedbackResponses((prev) => [...prev, { question, response, feedback: data }]);
+    } catch (error) {
+      console.error("Error submitting response:", error);
     }
   };
 
-  const handleExitInterview = () => {
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => track.stop());
+  const handleNextQuestion = async () => {
+    stopRecording();
+
+    // Get the latest response from recordedResponses
+    const latestResponse = recordedResponses[recordedResponses.length - 1];
+    if (latestResponse) {
+      await submitResponse(latestResponse.question, latestResponse.response);
     }
-    setIsInterviewStarted(false);
+
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex((prev) => prev + 1);
+    } else {
+      setIsInterviewComplete(true);
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+      }
+    }
   };
+
+  if (isInterviewComplete) {
+    return (
+      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl mx-auto text-center">
+        <h2 className="text-2xl font-bold mb-4">Interview Feedback</h2>
+        {feedbackResponses.map((item, index) => (
+          <div key={index} className="mb-4 p-4 bg-gray-100 rounded-lg">
+            <p><strong>Question:</strong> {item.question}</p>
+            <p><strong>Your Answer:</strong> {item.response}</p>
+            <p><strong>Feedback:</strong> {item.feedback.feedback}</p>
+            <p><strong>Filler Percentage:</strong> {item.feedback.filler_percentage.toFixed(2)}%</p>
+            <p><strong>Relevance:</strong> {item.feedback.relevance}</p>
+            <p><strong>Repeated Words Count:</strong> {item.feedback.repeated_words_count}</p>
+            <p><strong>Sentiment:</strong> {item.feedback.sentiment}</p>
+          </div>
+        ))}
+        <button
+          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded"
+          onClick={() => setIsInterviewStarted(false)}
+        >
+          Go to Home
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl mx-auto text-center">
@@ -128,7 +183,7 @@ const MediaInput = ({ questions, setIsInterviewStarted }) => {
         </button>
         <button
           className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded"
-          onClick={handleExitInterview}
+          onClick={() => setIsInterviewStarted(false)}
         >
           Exit Interview
         </button>
